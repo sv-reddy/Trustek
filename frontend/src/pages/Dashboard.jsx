@@ -28,8 +28,14 @@ export default function Dashboard() {
             disabled={isConnecting}
             className="btn-primary disabled:opacity-50"
           >
-            {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+            {isConnecting ? 'Connecting...' : 'Connect Braavos'}
           </button>
+        )}
+        {address && (
+          <div className="text-right">
+            <p className="text-sm text-gray-400">Wallet Status</p>
+            <p className="text-green-500 font-medium">Connected to Braavos</p>
+          </div>
         )}
       </div>
 
@@ -58,7 +64,7 @@ export default function Dashboard() {
       {!address && (
         <div className="card bg-yellow-500/10 border-yellow-500">
           <p className="text-yellow-500 text-center">
-            Please connect your Starknet wallet to start using voice commands
+            Please connect your Braavos wallet to start using voice commands
           </p>
         </div>
       )}
