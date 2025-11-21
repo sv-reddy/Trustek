@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { LogOut, Home, User, Mic } from 'lucide-react'
+import { LogOut, Home, User, Shield } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useWallet } from '../contexts/WalletContext'
 
@@ -22,7 +22,7 @@ export default function Layout({ children }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Mic className="h-8 w-8 text-primary-500" />
+              <Shield className="h-8 w-8 text-primary-500" />
               <h1 className="ml-2 text-xl font-bold text-white">TrusTek Fusion</h1>
             </div>
 

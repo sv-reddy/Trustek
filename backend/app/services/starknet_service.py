@@ -7,7 +7,7 @@ try:
     STARKNET_AVAILABLE = True
 except Exception as e:
     print(f"Warning: Starknet dependencies not available: {e}")
-    print("Starknet features will be disabled. Portfolio data will be mocked.")
+    print("Starknet features will be disabled. Using HTTP RPC fallback.")
     STARKNET_AVAILABLE = False
     FullNodeClient = None
     Account = None
@@ -75,12 +75,10 @@ class StarknetService:
             Dictionary with transaction hash and status
         """
         if not STARKNET_AVAILABLE:
-            # Mock response for development
-            print(f"[MOCK] Rebalancing for {account_address} with range {new_range}")
-            return {
-                "tx_hash": "0x1234567890abcdef",
-                "status": "confirmed"
-            }
+            raise RuntimeError(
+                "Starknet dependencies not available. "
+                "Transaction signing requires starknet-py or use contract_service for HTTP RPC."
+            )
             
         try:
             account = await self.get_account(session_key_private, account_address)
@@ -138,21 +136,15 @@ class StarknetService:
             }
     
     async def get_portfolio_data(self, address: str) -> dict:
-        """Fetch portfolio data from Starknet."""
-        # Simplified - in production, query actual contracts
+        """Fetch portfolio data from Starknet contracts."""
+        # Use contract_service for actual on-chain queries
+        from app.services.contract_service import vault_service, position_service
+        
+        vault_balance = await vault_service.get_balance(address)
+        
         return {
-            "total_value": 50000,
-            "current_pool": "ETH/USDC",
-            "risk_score": 5,
-            "positions": [
-                {
-                    "pool": "ETH/USDC",
-                    "value": 50000,
-                    "range": "1800-2200",
-                    "apy": "12.5",
-                    "status": "active"
-                }
-            ]
+            "vault_balance": vault_balance or 0,
+            "positions": []  # Fetch from position_service when contract is deployed
         }
     
     def _hash_string(self, text: str) -> int:

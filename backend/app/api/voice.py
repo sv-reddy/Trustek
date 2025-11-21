@@ -27,10 +27,11 @@ async def transcribe_audio(audio: UploadFile = File(...)):
             temp_file.write(content)
             temp_path = temp_file.name
         
-        # TODO: Integrate with actual voice transcription service
-        # For now, return a mock response
-        transcript = "Execute strategy on my ETH USDC pool"
-        action = "EXECUTE_STRATEGY"
+        # TODO: Integrate with actual voice transcription service (e.g., Google Speech-to-Text, Whisper)
+        raise HTTPException(
+            status_code=501,
+            detail="Voice transcription service not yet implemented. Please integrate a speech-to-text API."
+        )
         
         # Clean up temp file
         os.unlink(temp_path)

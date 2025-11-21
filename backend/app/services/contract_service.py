@@ -60,12 +60,12 @@ class ContractService:
         private_key: str
     ) -> Dict:
         """Invoke a state-changing function (requires signing)"""
-        # This would require proper transaction signing
-        # For now, return a placeholder
-        return {
-            "success": False,
-            "error": "Transaction signing not implemented yet - needs account abstraction"
-        }
+        # TODO: Implement proper transaction signing with account abstraction
+        # Requires starknet-py Account class or custom signing logic
+        raise NotImplementedError(
+            "Transaction signing not implemented. "
+            "Deploy contracts first, then implement signing with starknet-py Account or custom signer."
+        )
 
 
 class VaultService(ContractService):
