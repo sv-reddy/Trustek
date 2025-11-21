@@ -29,7 +29,15 @@ class StarknetService:
             return
             
         self.client = FullNodeClient(node_url=settings.STARKNET_RPC_URL)
-        self.chain_id = StarknetChainId.TESTNET if settings.STARKNET_NETWORK == "goerli" else StarknetChainId.MAINNET
+        # Use chain ID from config (SN_SEPOLIA for devnet)
+        if settings.STARKNET_CHAIN_ID:
+            self.chain_id = int(settings.STARKNET_CHAIN_ID, 16)
+        elif settings.STARKNET_NETWORK == "devnet":
+            self.chain_id = StarknetChainId.TESTNET
+        elif settings.STARKNET_NETWORK == "goerli":
+            self.chain_id = StarknetChainId.TESTNET
+        else:
+            self.chain_id = StarknetChainId.MAINNET
     
     async def get_account(self, private_key: str, address: str) -> Account:
         """Create an Account instance from private key."""

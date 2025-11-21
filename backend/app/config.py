@@ -12,8 +12,17 @@ class Settings(BaseSettings):
     
     # Starknet
     STARKNET_RPC_URL: str
-    STARKNET_NETWORK: str = "goerli"
+    STARKNET_NETWORK: str = "devnet"
+    STARKNET_CHAIN_ID: str = "0x534e5f5345504f4c4941"
+    STARKNET_ACCOUNT_ADDRESS: str = ""
+    STARKNET_PRIVATE_KEY: str = ""
+    STARKNET_ETH_TOKEN: str = ""
+    STARKNET_STRK_TOKEN: str = ""
+    STARKNET_UDC_ADDRESS: str = ""
     STARKNET_VAULT_CONTRACT: str = ""
+    STARKNET_SESSION_KEY_CONTRACT: str = ""
+    STARKNET_POSITION_CONTRACT: str = ""
+    STARKNET_REBALANCE_CONTRACT: str = ""
     
     # Gemini AI
     GEMINI_API_KEY: str
