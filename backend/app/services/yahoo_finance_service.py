@@ -20,7 +20,9 @@ class YahooFinanceService:
         'SOL': 'SOL-USD',
         'ADA': 'ADA-USD',
         'DOT': 'DOT-USD',
-        'MATIC': 'MATIC-USD',
+        'MATIC': 'POL-USD',  # MATIC rebranded to POL (Polygon)
+        'BNB': 'BNB-USD',
+        'DOGE': 'DOGE-USD',
         'AVAX': 'AVAX-USD',
         'LINK': 'LINK-USD'
     }
@@ -44,13 +46,14 @@ class YahooFinanceService:
             
             ticker = yf.Ticker(ticker_symbol)
             info = ticker.info
-            hist = ticker.history(period='2d')
             
-            if hist.empty or 'regularMarketPrice' not in info:
-                logger.error(f"No data available for {symbol}")
+            # Get current price from info
+            current_price = info.get('regularMarketPrice') or info.get('currentPrice') or info.get('price')
+            if not current_price:
+                logger.error(f"No price data available for {symbol}")
                 return None
             
-            current_price = info.get('regularMarketPrice', 0)
+            # Get previous close
             previous_close = info.get('regularMarketPreviousClose', current_price)
             
             # Calculate 24h change
@@ -58,9 +61,9 @@ class YahooFinanceService:
             
             return {
                 'symbol': symbol.upper(),
-                'price': round(current_price, 6),
-                'change24h': round(change_24h, 2),
-                'previousClose': round(previous_close, 6),
+                'price': round(float(current_price), 6),
+                'change24h': round(float(change_24h), 2),
+                'previousClose': round(float(previous_close), 6),
                 'timestamp': datetime.utcnow().isoformat()
             }
             

@@ -5,6 +5,7 @@ import {
   DollarSign, Gauge, Flame, Wind, User, Bell, Smartphone, Mail, Search
 } from 'lucide-react'
 import PortfolioDashboard from '../components/PortfolioDashboard'
+import TokenPortfolio from '../components/TokenPortfolio'
 import { useWallet } from '../contexts/WalletContext'
 
 export default function Dashboard() {
@@ -17,15 +18,19 @@ export default function Dashboard() {
 
   // Portfolio Overview State
   const [portfolioData, setPortfolioData] = useState({
-    tvl: 2450750.50,
-    netWorthChange24h: { percent: 2.5, amount: 61268.76 },
-    netWorthChange7d: { percent: 8.3, amount: 203450.25 },
-    netWorthChange30d: { percent: 15.6, amount: 383000.00 },
-    totalFeesAllTime: 45250.30,
-    impermanentLossAllTime: { usd: -8450.25, percent: -0.34 },
-    impermanentLoss24h: { usd: -125.50, percent: -0.005 },
+    tvl: 0,
+    netWorthChange24h: { percent: 0, amount: 0 },
+    netWorthChange7d: { percent: 0, amount: 0 },
+    netWorthChange30d: { percent: 0, amount: 0 },
+    totalFeesAllTime: 0,
+    impermanentLossAllTime: { usd: 0, percent: 0 },
+    impermanentLoss24h: { usd: 0, percent: 0 },
     riskScore: 42
   })
+
+  // Crypto Tokens State
+  const [tokens, setTokens] = useState([])
+  const [loadingTokens, setLoadingTokens] = useState(true)
 
   // Live Positions State
   const [positions, setPositions] = useState([
@@ -124,6 +129,55 @@ export default function Dashboard() {
       voice: true
     }
   })
+
+  // Fetch crypto tokens and calculate portfolio
+  useEffect(() => {
+    const fetchTokens = async () => {
+      try {
+        setLoadingTokens(true)
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000'}/api/tokens/`)
+        const tokensData = await response.json()
+        
+        if (tokensData && Array.isArray(tokensData)) {
+          setTokens(tokensData)
+          
+          // Mock prices for calculation
+          const mockPrices = {
+            BTC: 45000, ETH: 2800, USDT: 1, USDC: 1,
+            ADA: 0.55, SOL: 105, BNB: 320, DOT: 7.5,
+            DOGE: 0.08, MATIC: 0.95
+          }
+          
+          // Calculate total portfolio value
+          let totalValue = 0
+          tokensData.forEach(token => {
+            const price = mockPrices[token.symbol] || 0
+            totalValue += token.balance * price
+          })
+          
+          setPortfolioData(prev => ({
+            ...prev,
+            tvl: totalValue,
+            netWorthChange24h: { percent: 2.5, amount: totalValue * 0.025 },
+            netWorthChange7d: { percent: 8.3, amount: totalValue * 0.083 },
+            netWorthChange30d: { percent: 15.6, amount: totalValue * 0.156 }
+          }))
+        }
+      } catch (error) {
+        console.error('Error fetching tokens:', error)
+      } finally {
+        setLoadingTokens(false)
+      }
+    }
+
+    // Fetch immediately
+    fetchTokens()
+
+    // Refresh every 30 seconds
+    const tokenInterval = setInterval(fetchTokens, 30000)
+
+    return () => clearInterval(tokenInterval)
+  }, [])
 
   // Fetch real-time crypto prices from Yahoo Finance API
   useEffect(() => {
@@ -399,45 +453,10 @@ export default function Dashboard() {
     </button>
   )
 
-  // Top Banner Component
-  const TopBanner = () => (
-    <div className="card bg-gradient-to-r from-dark-800 to-dark-700 p-6 flex items-center justify-between">
-      <div className="grid grid-cols-4 gap-8 flex-1">
-        <div>
-          <p className="text-gray-400 text-sm">Total TVL</p>
-          <p className="text-2xl font-bold text-white">${(portfolioData.tvl / 1000000).toFixed(2)}M</p>
-          <p className={`text-xs mt-1 ${portfolioData.netWorthChange24h.percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            {portfolioData.netWorthChange24h.percent >= 0 ? '↑' : '↓'} 
-            {Math.abs(portfolioData.netWorthChange24h.percent).toFixed(2)}% (24h)
-          </p>
-        </div>
-        <div>
-          <p className="text-gray-400 text-sm">24h P&L</p>
-          <p className={`text-2xl font-bold ${portfolioData.netWorthChange24h.amount >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            ${Math.abs(portfolioData.netWorthChange24h.amount).toFixed(0)}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {portfolioData.netWorthChange24h.amount >= 0 ? 'Profit' : 'Loss'}
-          </p>
-        </div>
-        <div>
-          <p className="text-gray-400 text-sm">Risk Score</p>
-          <p className="text-2xl font-bold text-white">{portfolioData.riskScore}</p>
-          <p className="text-xs text-gray-500 mt-1">
-            {portfolioData.riskScore < 30 ? 'Low Risk' : portfolioData.riskScore < 70 ? 'Medium Risk' : 'High Risk'}
-          </p>
-        </div>
-        <div>
-          <p className="text-gray-400 text-sm">Last Action</p>
-          <p className="text-sm font-bold text-primary-500">✓ Rebalance verified</p>
-          <p className="text-xs text-gray-500 mt-1">ZK Proof confirmed</p>
-        </div>
-      </div>
-    </div>
-  )
+
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4 flex-1">
@@ -494,19 +513,7 @@ export default function Dashboard() {
           <p className="text-sm text-gray-400">Last Update</p>
           <p className="text-xs text-gray-500">{refreshTime.toLocaleTimeString()}</p>
         </div>
-        {!address && (
-          <button
-            onClick={connectWallet}
-            disabled={isConnecting}
-            className="btn-primary disabled:opacity-50"
-          >
-            {isConnecting ? 'Connecting...' : 'Connect Wallet'}
-          </button>
-        )}
       </div>
-
-      {/* Top Banner */}
-      <TopBanner />
 
       {/* Tab Navigation */}
       <div className="grid grid-cols-3 gap-2 border-b border-dark-700 pb-2">
@@ -518,81 +525,8 @@ export default function Dashboard() {
       {/* OVERVIEW TAB */}
       {activeTab === 'overview' && (
         <div className="space-y-8">
-          {/* Portfolio Overview Section */}
-          <div>
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Wallet className="h-6 w-6 text-primary-500" />
-              Portfolio Overview
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <MetricCard
-                icon={Wallet}
-                label="Total Portfolio Value"
-                value={`$${(portfolioData.tvl / 1000000).toFixed(2)}M`}
-                change={portfolioData.netWorthChange24h.percent}
-                color="primary"
-              />
-              <MetricCard
-                icon={TrendingUp}
-                label="Net Worth Change (24h)"
-                value={`$${Math.abs(portfolioData.netWorthChange24h.amount / 1000).toFixed(1)}K`}
-                change={portfolioData.netWorthChange24h.percent}
-                color={portfolioData.netWorthChange24h.amount >= 0 ? 'green' : 'red'}
-              />
-              <MetricCard
-                icon={TrendingUp}
-                label="Net Worth Change (7d)"
-                value={`$${(portfolioData.netWorthChange7d.amount / 1000).toFixed(1)}K`}
-                change={portfolioData.netWorthChange7d.percent}
-                color="green"
-              />
-              <MetricCard
-                icon={DollarSign}
-                label="Total Fees Earned (All-time)"
-                value={`$${(portfolioData.totalFeesAllTime / 1000).toFixed(1)}K`}
-                change={5.2}
-                color="primary"
-              />
-              <MetricCard
-                icon={Flame}
-                label="Impermanent Loss (All-time)"
-                value={`$${Math.abs(portfolioData.impermanentLossAllTime.usd / 1000).toFixed(1)}K`}
-                change={portfolioData.impermanentLossAllTime.percent}
-                color="red"
-              />
-              <MetricCard
-                icon={Gauge}
-                label="Current Risk Score"
-                value={portfolioData.riskScore}
-                change={null}
-                color="orange"
-              />
-            </div>
-          </div>
-
-          {/* 30 Day Period Breakdown */}
-          <div>
-            <h3 className="text-lg font-bold text-white mb-4">30-Day Performance</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="card p-6">
-                <p className="text-gray-400 text-sm mb-2">Net Worth Change</p>
-                <p className={`text-3xl font-bold mb-3 ${portfolioData.netWorthChange30d.amount >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {portfolioData.netWorthChange30d.amount >= 0 ? '+' : '-'}${Math.abs(portfolioData.netWorthChange30d.amount / 1000).toFixed(1)}K
-                </p>
-                <p className="text-xs text-gray-500">{portfolioData.netWorthChange30d.percent.toFixed(1)}% change</p>
-              </div>
-              <div className="card p-6">
-                <p className="text-gray-400 text-sm mb-2">Total Fees vs Costs</p>
-                <p className="text-3xl font-bold text-primary-500 mb-3">${(performance.realizedPnL30d.fees / 1000).toFixed(1)}K</p>
-                <p className="text-xs text-gray-500">Collected in fees this month</p>
-              </div>
-              <div className="card p-6">
-                <p className="text-gray-400 text-sm mb-2">IL This Period</p>
-                <p className="text-3xl font-bold text-red-500 mb-3">${Math.abs(performance.realizedPnL30d.il / 1000).toFixed(1)}K</p>
-                <p className="text-xs text-gray-500">Impermanent Loss</p>
-              </div>
-            </div>
-          </div>
+          {/* Token Portfolio Section */}
+          <TokenPortfolio />
         </div>
       )}
 

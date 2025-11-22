@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 
 from app.config import settings
-from app.api import voice, portfolio, transactions, session_keys, auth, market
+from app.api import voice, portfolio, transactions, session_keys, auth, market, tokens
 
 
 @asynccontextmanager
@@ -39,6 +39,7 @@ app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio"]
 app.include_router(transactions.router, prefix="/api/transactions", tags=["Transactions"])
 app.include_router(session_keys.router, prefix="/api/session-key", tags=["Session Keys"])
 app.include_router(market.router, prefix="/api/market", tags=["Market Data"])
+app.include_router(tokens.router, prefix="/api/tokens", tags=["Tokens"])
 
 
 @app.get("/")

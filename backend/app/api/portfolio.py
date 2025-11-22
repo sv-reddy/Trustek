@@ -1,10 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Optional
-from app.services.starknet_service import starknet_service
-from app.services.contract_service import vault_service, position_service
 from app.services.yahoo_finance_service import YahooFinanceService
 from app.db.supabase import get_supabase
+from services.token_service import token_service
 
 router = APIRouter()
 
@@ -12,10 +11,9 @@ router = APIRouter()
 @router.get("/")
 async def get_portfolio(user_id: str = None):
     """
-    Get user's complete portfolio data from Starknet contracts and real-time market prices.
+    Get user's complete portfolio data from backend token service and real-time market prices.
     Combines:
-    - Vault balance from Starknet VaultManager contract
-    - Open positions from PositionManager contract
+    - Token balances from backend service
     - Transaction history from Supabase
     - Real-time crypto prices from Yahoo Finance
     """
@@ -25,96 +23,86 @@ async def get_portfolio(user_id: str = None):
     supabase = get_supabase()
     
     try:
-        # 1. Get user's profile with wallet address
-        profile = supabase.table("user_profiles").select("*").eq(
-            "user_id", user_id
-        ).single().execute()
+        # 1. Get user's profile
+        try:
+            profile = supabase.table("user_profiles").select("*").eq(
+                "user_id", user_id
+            ).single().execute()
+            
+            if not profile.data:
+                # User not found, create default response
+                profile_data = {"risk_tolerance": 5, "starknet_address": None}
+            else:
+                profile_data = profile.data
+        except Exception as profile_error:
+            # Profile doesn't exist, use defaults
+            print(f"Profile not found for user {user_id}: {profile_error}")
+            profile_data = {"risk_tolerance": 5, "starknet_address": None}
         
-        if not profile.data:
-            raise HTTPException(status_code=404, detail="User not found")
+        wallet_address = profile_data.get("starknet_address")
         
-        wallet_address = profile.data.get("starknet_address")
-        
-        if not wallet_address:
-            return {
-                "total_value": 0,
-                "vault_balance": 0,
-                "current_pool": "N/A",
-                "risk_score": profile.data.get("risk_tolerance", 5),
-                "positions": [],
-                "recent_transactions": [],
-                "pnl": 0,
-                "market_prices": {}
-            }
-        
-        # 2. Get vault balance from Starknet contract (real-time on-chain data)
-        vault_balance = await vault_service.get_balance(wallet_address)
-        vault_balance_eth = (vault_balance or 0) / 1e18  # Convert from wei to ETH
-        
-        # 3. Get real-time market prices from Yahoo Finance
-        market_prices = YahooFinanceService.get_multiple_prices(['ETH', 'BTC', 'USDC'])
+        # 2. Get real-time market prices from Yahoo Finance
+        market_prices = YahooFinanceService.get_multiple_prices(['ETH', 'BTC', 'USDC', 'USDT', 'ADA', 'SOL', 'BNB', 'DOT', 'DOGE', 'MATIC'])
         eth_price = market_prices.get('ETH', {}).get('price', 0)
         
-        # Calculate vault value in USD
-        vault_value_usd = vault_balance_eth * eth_price
+        # 3. Get tokens from backend service
+        tokens = token_service.get_all_tokens()
+        
+        # Create price dict for portfolio calculation
+        price_dict = {symbol: data.get('price', 0) for symbol, data in market_prices.items()}
+        portfolio_data = token_service.get_portfolio_value(price_dict)
+        portfolio_value = portfolio_data.get('total_value', 0)
         
         # 4. Get recent transactions from Supabase
         transactions = supabase.table("transaction_log").select("*").eq(
             "user_id", user_id
         ).order("timestamp", desc=True).limit(10).execute()
         
-        # 5. Calculate total deposits/withdrawals in ETH
-        total_deposits_eth = sum(
-            float(tx.get("amount", 0)) / 1e18
-            for tx in transactions.data 
-            if tx.get("action") == "deposit"
-        ) if transactions.data else 0
+        # 5. Calculate portfolio metrics
+        total_deposits_usd = 0
+        total_withdrawals_usd = 0
         
-        total_withdrawals_eth = sum(
-            float(tx.get("amount", 0)) / 1e18
-            for tx in transactions.data 
-            if tx.get("action") == "withdraw"
-        ) if transactions.data else 0
+        if transactions.data:
+            for tx in transactions.data:
+                if tx.get("action") == "deposit":
+                    total_deposits_usd += float(tx.get("amount", 0))
+                elif tx.get("action") == "withdraw":
+                    total_withdrawals_usd += float(tx.get("amount", 0))
         
-        # Calculate net deposits in ETH
-        net_deposits_eth = total_deposits_eth - total_withdrawals_eth
-        net_deposits_usd = net_deposits_eth * eth_price
+        net_deposits_usd = total_deposits_usd - total_withdrawals_usd
         
         # 6. Calculate P&L
-        pnl_eth = vault_balance_eth - net_deposits_eth
-        pnl_usd = vault_value_usd - net_deposits_usd
+        pnl_usd = portfolio_value - net_deposits_usd
         pnl_percentage = (pnl_usd / net_deposits_usd * 100) if net_deposits_usd > 0 else 0
         
-        # 7. Get positions from Starknet PositionManager contract
-        # TODO: Implement position fetching when PositionManager contract is deployed
-        positions = []
-        
-        # 8. Calculate portfolio metrics
-        total_value_usd = vault_value_usd
+        # 7. Prepare token list with prices
+        token_list = []
+        for token in tokens:
+            price = market_prices.get(token['symbol'], {}).get('price', 0)
+            value = token['balance'] * price
+            token_list.append({
+                **token,
+                'price': price,
+                'value': value,
+                'change24h': market_prices.get(token['symbol'], {}).get('change24h', 0)
+            })
         
         return {
             "user_id": user_id,
-            "wallet_address": wallet_address,
+            "wallet_address": wallet_address or "Not connected",
             
-            # Vault Data (from Starknet contract)
-            "vault_balance_wei": vault_balance or 0,
-            "vault_balance_eth": vault_balance_eth,
-            "vault_balance_usd": vault_value_usd,
+            # Portfolio Value (from backend token service)
+            "total_value_usd": portfolio_value,
             
-            # Portfolio Value
-            "total_value_usd": total_value_usd,
-            "total_value_eth": vault_balance_eth,
+            # Token Holdings
+            "tokens": token_list,
             
             # Deposits/Withdrawals
-            "total_deposits_eth": total_deposits_eth,
-            "total_deposits_usd": total_deposits_eth * eth_price,
-            "total_withdrawals_eth": total_withdrawals_eth,
-            "total_withdrawals_usd": total_withdrawals_eth * eth_price,
-            "net_deposits_eth": net_deposits_eth,
+            "total_deposits_usd": total_deposits_usd,
+            "total_withdrawals_usd": total_withdrawals_usd,
             "net_deposits_usd": net_deposits_usd,
             
             # P&L Metrics
-            "pnl_eth": pnl_eth,
             "pnl_usd": pnl_usd,
             "pnl_percentage": pnl_percentage,
             
@@ -123,11 +111,9 @@ async def get_portfolio(user_id: str = None):
             "eth_price_usd": eth_price,
             
             # Additional Data
-            "current_pool": "N/A",
-            "risk_score": profile.data.get("risk_tolerance", 5),
-            "positions": positions,
+            "risk_score": profile_data.get("risk_tolerance", 5),
             "recent_transactions": transactions.data[:5] if transactions.data else [],
-            "last_sync": profile.data.get("last_balance_sync")
+            "last_sync": profile_data.get("last_balance_sync")
         }
         
     except Exception as e:
@@ -136,25 +122,33 @@ async def get_portfolio(user_id: str = None):
 
 @router.get("/stats")
 async def get_portfolio_stats(user_id: str):
-    """Get aggregated portfolio statistics from Starknet and real-time market data."""
+    """Get aggregated portfolio statistics from backend token service and real-time market data."""
     supabase = get_supabase()
     
     try:
-        # Get user's wallet address
-        profile = supabase.table("user_profiles").select("*").eq(
-            "user_id", user_id
-        ).single().execute()
+        # Get user's profile
+        try:
+            profile = supabase.table("user_profiles").select("*").eq(
+                "user_id", user_id
+            ).single().execute()
+            
+            if not profile.data:
+                profile_data = {}
+            else:
+                profile_data = profile.data
+        except Exception:
+            # Profile doesn't exist, use empty dict
+            profile_data = {}
         
-        if not profile.data:
-            raise HTTPException(status_code=404, detail="User not found")
+        # Get real-time market prices
+        market_prices = YahooFinanceService.get_multiple_prices(['ETH', 'BTC', 'USDC', 'USDT', 'ADA', 'SOL', 'BNB', 'DOT', 'DOGE', 'MATIC'])
         
-        wallet_address = profile.data.get("starknet_address")
+        # Get portfolio value from backend token service
+        price_dict = {symbol: data.get('price', 0) for symbol, data in market_prices.items()}
+        portfolio_data = token_service.get_portfolio_value(price_dict)
+        portfolio_value = portfolio_data.get('total_value', 0)
         
-        # Get vault balance from Starknet contract
-        vault_balance_wei = await vault_service.get_balance(wallet_address) if wallet_address else 0
-        vault_balance_eth = (vault_balance_wei or 0) / 1e18
-        
-        # Get real-time ETH price
+        # Get ETH price
         eth_price_data = YahooFinanceService.get_crypto_price('ETH')
         eth_price = eth_price_data.get('price', 0) if eth_price_data else 0
         
@@ -166,25 +160,22 @@ async def get_portfolio_stats(user_id: str):
         if not transactions.data:
             return {
                 "total_transactions": 0,
-                "total_deposits_eth": 0,
                 "total_deposits_usd": 0,
-                "total_withdrawals_eth": 0,
                 "total_withdrawals_usd": 0,
                 "total_trades": 0,
-                "vault_balance_eth": vault_balance_eth,
-                "vault_balance_usd": vault_balance_eth * eth_price,
+                "portfolio_value_usd": portfolio_value,
                 "eth_price_usd": eth_price
             }
         
-        # Calculate deposits/withdrawals in ETH
-        total_deposits_eth = sum(
-            float(tx.get("amount", 0)) / 1e18
+        # Calculate deposits/withdrawals in USD
+        total_deposits_usd = sum(
+            float(tx.get("amount", 0))
             for tx in transactions.data 
             if tx.get("action") == "deposit"
         )
         
-        total_withdrawals_eth = sum(
-            float(tx.get("amount", 0)) / 1e18
+        total_withdrawals_usd = sum(
+            float(tx.get("amount", 0))
             for tx in transactions.data 
             if tx.get("action") == "withdraw"
         )
@@ -195,15 +186,12 @@ async def get_portfolio_stats(user_id: str):
         return {
             "total_transactions": len(transactions.data),
             
-            # Vault balance from Starknet contract
-            "vault_balance_eth": vault_balance_eth,
-            "vault_balance_usd": vault_balance_eth * eth_price,
+            # Portfolio value from backend token service
+            "portfolio_value_usd": portfolio_value,
             
             # Deposits/Withdrawals
-            "total_deposits_eth": total_deposits_eth,
-            "total_deposits_usd": total_deposits_eth * eth_price,
-            "total_withdrawals_eth": total_withdrawals_eth,
-            "total_withdrawals_usd": total_withdrawals_eth * eth_price,
+            "total_deposits_usd": total_deposits_usd,
+            "total_withdrawals_usd": total_withdrawals_usd,
             
             # Trading stats
             "total_trades": len(trades),
