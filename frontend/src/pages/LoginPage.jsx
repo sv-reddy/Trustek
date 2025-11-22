@@ -21,18 +21,42 @@ export default function LoginPage() {
 
     try {
       if (isLogin) {
-        await signIn(email, password)
+        const result = await signIn(email, password)
+        console.log('Login successful:', result)
+        navigate('/')
       } else {
         if (!phoneNumber) {
           setError('Phone number is required for registration')
           setLoading(false)
           return
         }
-        await signUp(email, password, phoneNumber)
+        const result = await signUp(email, password, phoneNumber)
+        console.log('Signup successful:', result)
+        
+        // Show success message for email confirmation
+        if (result.user && !result.session) {
+          setError('Account created! Please check your email to verify your account.')
+          setLoading(false)
+          return
+        }
+        
+        navigate('/')
       }
-      navigate('/')
     } catch (err) {
-      setError(err.message || 'Authentication failed')
+      console.error('Auth error:', err)
+      
+      // Provide more specific error messages
+      if (err.message?.includes('Invalid login credentials')) {
+        setError('Invalid email or password. Please check your credentials and try again.')
+      } else if (err.message?.includes('Email not confirmed')) {
+        setError('Please verify your email address before logging in.')
+      } else if (err.message?.includes('User already registered')) {
+        setError('This email is already registered. Please login instead.')
+      } else if (err.message?.includes('Password should be at least')) {
+        setError('Password must be at least 6 characters long.')
+      } else {
+        setError(err.message || 'Authentication failed. Please try again.')
+      }
     } finally {
       setLoading(false)
     }

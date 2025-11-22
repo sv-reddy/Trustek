@@ -12,6 +12,8 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('overview')
   const [refreshTime, setRefreshTime] = useState(new Date())
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [isSearching, setIsSearching] = useState(false)
 
   // Portfolio Overview State
   const [portfolioData, setPortfolioData] = useState({
@@ -236,6 +238,33 @@ export default function Dashboard() {
     }
   }, [])
 
+  // Handle crypto search with Yahoo Finance API
+  const handleSearch = async (query) => {
+    setSearchQuery(query)
+    
+    if (query.length < 2) {
+      setSearchResults([])
+      return
+    }
+    
+    setIsSearching(true)
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/market/search?q=${encodeURIComponent(query)}`)
+      const result = await response.json()
+      
+      if (result.success && result.data) {
+        setSearchResults(result.data)
+      } else {
+        setSearchResults([])
+      }
+    } catch (error) {
+      console.error('Search error:', error)
+      setSearchResults([])
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
   // Utility Components
   const MetricCard = ({ 
     icon: Icon, 
@@ -359,13 +388,13 @@ export default function Dashboard() {
   const TabButton = ({ id, label, icon: Icon }) => (
     <button
       onClick={() => setActiveTab(id)}
-      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+      className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors w-full ${
         activeTab === id 
           ? 'bg-primary-600 text-white' 
           : 'text-gray-400 hover:text-white hover:bg-dark-700'
       }`}
     >
-      <Icon className="h-4 w-4" />
+      <Icon className="h-5 w-5" />
       {label}
     </button>
   )
@@ -410,48 +439,79 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">TrusTek Fusion Dashboard</h1>
-        </div>
-        <div className="flex items-center gap-4">
-          {/* Crypto Search Bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4 flex-1">
+          {/* Crypto Search Bar - Enlarged */}
+          <div className="relative flex-1 max-w-4xl">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-6 w-6 text-gray-400" />
             <input
               type="text"
-              placeholder="Search crypto..."
+              placeholder="Search cryptocurrencies..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-dark-700 text-white pl-10 pr-4 py-2 rounded-lg border border-dark-600 focus:border-primary-500 focus:outline-none w-64"
+              onChange={(e) => handleSearch(e.target.value)}
+              className="bg-dark-700 text-white pl-14 pr-6 py-4 text-lg rounded-lg border border-dark-600 focus:border-primary-500 focus:outline-none w-full"
             />
+            
+            {/* Search Results Dropdown */}
+            {searchQuery && (searchResults.length > 0 || isSearching) && (
+              <div className="absolute top-full mt-2 w-full bg-dark-800 border border-dark-600 rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
+                {isSearching ? (
+                  <div className="p-4 text-center text-gray-400">
+                    <div className="animate-pulse">Searching...</div>
+                  </div>
+                ) : (
+                  <>
+                    {searchResults.map((crypto, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 hover:bg-dark-700 cursor-pointer border-b border-dark-700 last:border-b-0"
+                        onClick={() => {
+                          setSearchQuery('')
+                          setSearchResults([])
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-bold text-white">{crypto.symbol}</p>
+                            <p className="text-xs text-gray-400">Current Price</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-white">${crypto.price?.toFixed(6)}</p>
+                            <p className={`text-xs ${crypto.change24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              {crypto.change24h >= 0 ? '+' : ''}{crypto.change24h?.toFixed(2)}%
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
           </div>
-          <div className="text-right">
-            <p className="text-sm text-gray-400">Last Update</p>
-            <p className="text-xs text-gray-500">{refreshTime.toLocaleTimeString()}</p>
-          </div>
-          {!address && (
-            <button
-              onClick={connectWallet}
-              disabled={isConnecting}
-              className="btn-primary disabled:opacity-50"
-            >
-              {isConnecting ? 'Connecting...' : 'Connect Wallet'}
-            </button>
-          )}
         </div>
+        <div className="text-right">
+          <p className="text-sm text-gray-400">Last Update</p>
+          <p className="text-xs text-gray-500">{refreshTime.toLocaleTimeString()}</p>
+        </div>
+        {!address && (
+          <button
+            onClick={connectWallet}
+            disabled={isConnecting}
+            className="btn-primary disabled:opacity-50"
+          >
+            {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+          </button>
+        )}
       </div>
 
       {/* Top Banner */}
       <TopBanner />
 
       {/* Tab Navigation */}
-      <div className="flex gap-2 overflow-x-auto pb-2 border-b border-dark-700">
+      <div className="grid grid-cols-3 gap-2 border-b border-dark-700 pb-2">
         <TabButton id="overview" label="Overview" icon={Activity} />
-        <TabButton id="positions" label="Live Positions" icon={PieChart} />
-        <TabButton id="performance" label="Performance" icon={BarChart3} />
         <TabButton id="market" label="Market" icon={TrendingUpIcon} />
-        <TabButton id="costs" label="Network & Costs" icon={Gauge} />
         <TabButton id="security" label="Security" icon={Shield} />
       </div>
 
@@ -536,82 +596,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* LIVE POSITIONS TAB */}
-      {activeTab === 'positions' && (
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <PieChart className="h-6 w-6 text-primary-500" />
-              Active Positions ({positions.length})
-            </h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {positions.map(PositionCard)}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* PERFORMANCE TAB */}
-      {activeTab === 'performance' && (
-        <div className="space-y-8">
-          <div>
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <BarChart3 className="h-6 w-6 text-primary-500" />
-              Performance Metrics
-            </h2>
-
-            {/* P&L Waterfall */}
-            <div className="card p-6 mb-6">
-              <h3 className="text-lg font-bold text-white mb-4">Realized P&L Breakdown (All-time)</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-dark-700 rounded">
-                  <span className="text-gray-400">Fees Earned</span>
-                  <span className="text-lg font-bold text-green-500">+${(performance.realizedPnLAllTime.fees / 1000).toFixed(1)}K</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-dark-700 rounded">
-                  <span className="text-gray-400">Gas Costs</span>
-                  <span className="text-lg font-bold text-red-500">${(Math.abs(performance.realizedPnLAllTime.gas) / 1000).toFixed(1)}K</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-dark-700 rounded">
-                  <span className="text-gray-400">Impermanent Loss</span>
-                  <span className="text-lg font-bold text-red-500">${(Math.abs(performance.realizedPnLAllTime.il) / 1000).toFixed(1)}K</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-primary-600/30 border border-primary-500 rounded">
-                  <span className="text-white font-bold">Net P&L</span>
-                  <span className="text-2xl font-bold text-primary-500">${(performance.realizedPnLAllTime.net / 1000).toFixed(1)}K</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Risk-Adjusted Metrics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <MetricCard
-                icon={TrendingUpIcon}
-                label="Annualized ROI"
-                value={`${performance.annualizedROI.toFixed(1)}%`}
-                change={2.3}
-                size="lg"
-              />
-              <MetricCard
-                icon={BarChart3}
-                label="Sharpe Ratio (30d)"
-                value={performance.sharpeRatio30d.toFixed(2)}
-                change={null}
-                size="lg"
-              />
-              <MetricCard
-                icon={Wind}
-                label="Portfolio Volatility (30d)"
-                value={`${performance.portfolioVolatility30d.toFixed(1)}%`}
-                change={performance.volatilityTrend}
-                size="lg"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MARKET TAB */}
       {activeTab === 'market' && (
         <div className="space-y-8">
           <div>
@@ -692,70 +677,6 @@ export default function Dashboard() {
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* NETWORK & COSTS TAB */}
-      {activeTab === 'costs' && (
-        <div className="space-y-8">
-          <div>
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Gauge className="h-6 w-6 text-primary-500" />
-              Network & Costs
-            </h2>
-
-            {/* Current Gas Prices */}
-            <div className="mb-6">
-              <h3 className="text-lg font-bold text-white mb-4">Current Starknet Gas Price</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="card p-6">
-                  <p className="text-gray-400 text-sm mb-2">Fast</p>
-                  <p className="text-2xl font-bold text-white mb-1">{networkData.gasPrice.fast.toFixed(9)} STRK</p>
-                  <p className="text-sm text-primary-500">${networkData.gasPriceUSD.fast.toFixed(3)}</p>
-                </div>
-                <div className="card p-6">
-                  <p className="text-gray-400 text-sm mb-2">Standard</p>
-                  <p className="text-2xl font-bold text-white mb-1">{networkData.gasPrice.standard.toFixed(9)} STRK</p>
-                  <p className="text-sm text-primary-500">${networkData.gasPriceUSD.standard.toFixed(3)}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Estimated Gas for Rebalance */}
-            <div className="mb-6">
-              <h3 className="text-lg font-bold text-white mb-4">Estimated Gas for Next Rebalance</h3>
-              <div className="card p-6">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-gray-400 text-sm mb-2">Gas Required</p>
-                    <p className="text-2xl font-bold text-white">{networkData.estimatedGasRebalance.wei} wei</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-gray-400 text-sm mb-2">Cost (USD)</p>
-                    <p className="text-2xl font-bold text-primary-500">${networkData.estimatedGasRebalance.usd.toFixed(2)}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Average Gas per Action */}
-            <div>
-              <h3 className="text-lg font-bold text-white mb-4">Average Gas per Agent Action (Last 30 Days)</h3>
-              <div className="card p-6">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-gray-400 text-sm mb-2">Avg Gas Usage</p>
-                    <p className="text-2xl font-bold text-white">{networkData.avgGasPerAction30d.wei} wei</p>
-                    <p className="text-xs text-gray-500 mt-1">Shows automation efficiency</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-gray-400 text-sm mb-2">Avg Cost</p>
-                    <p className="text-2xl font-bold text-primary-500">${networkData.avgGasPerAction30d.usd.toFixed(2)}</p>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>

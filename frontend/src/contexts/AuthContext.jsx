@@ -33,37 +33,53 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const signUp = async (email, password, phoneNumber) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    })
-    
-    if (error) throw error
-
-    // Create user profile
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .insert([
-          {
-            user_id: data.user.id,
-            phone_number: phoneNumber,
-          },
-        ])
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/dashboard`,
+        }
+      })
       
-      if (profileError) throw profileError
-    }
+      if (error) throw error
 
-    return data
+      // Create user profile
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .insert([
+            {
+              user_id: data.user.id,
+              phone_number: phoneNumber,
+            },
+          ])
+        
+        if (profileError) {
+          console.error('Profile creation error:', profileError)
+          // Don't throw - user is created, profile can be added later
+        }
+      }
+
+      return data
+    } catch (error) {
+      console.error('Signup error:', error)
+      throw error
+    }
   }
 
   const signIn = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    if (error) throw error
-    return data
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      if (error) throw error
+      return data
+    } catch (error) {
+      console.error('Signin error:', error)
+      throw error
+    }
   }
 
   const signOut = async () => {
