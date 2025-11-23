@@ -18,6 +18,12 @@ frontend:
   customHeaders:
     - pattern: '**/*'
       headers:
+        - key: 'Cache-Control'
+          value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0'
+        - key: 'Pragma'
+          value: 'no-cache'
+        - key: 'Expires'
+          value: '0'
         - key: 'Strict-Transport-Security'
           value: 'max-age=31536000; includeSubDomains'
         - key: 'X-Content-Type-Options'
@@ -26,4 +32,21 @@ frontend:
           value: 'DENY'
         - key: 'X-XSS-Protection'
           value: '1; mode=block'
+        - key: 'Referrer-Policy'
+          value: 'strict-origin-when-cross-origin'
+        - key: 'Permissions-Policy'
+          value: 'geolocation=(), microphone=(), camera=()'
+    - pattern: '/index.html'
+      headers:
+        - key: 'Cache-Control'
+          value: 'no-store, no-cache, must-revalidate, max-age=0'
+    - pattern: '/*.js'
+      headers:
+        - key: 'Cache-Control'
+          value: 'no-store, no-cache, must-revalidate, max-age=0'
+    - pattern: '/*.css'
+      headers:
+        - key: 'Cache-Control'
+          value: 'no-store, no-cache, must-revalidate, max-age=0'
+
 
