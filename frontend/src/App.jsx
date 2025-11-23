@@ -1,12 +1,10 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
-import ProtectedRoute from './components/ProtectedRoute'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
 import ProfilePage from './pages/ProfilePage'
-import ProfileCompletionPage from './pages/ProfileCompletionPage'
 
 function App() {
   const { user, loading } = useAuth()
@@ -24,31 +22,27 @@ function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginPage />} />
       <Route
-        path="/complete-profile"
-        element={
-          <ProtectedRoute>
-            <ProfileCompletionPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
         path="/dashboard"
         element={
-          <ProtectedRoute requireCompleteProfile={true}>
+          user ? (
             <Layout>
               <Dashboard />
             </Layout>
-          </ProtectedRoute>
+          ) : (
+            <Navigate to="/login" />
+          )
         }
       />
       <Route
         path="/profile"
         element={
-          <ProtectedRoute requireCompleteProfile={true}>
+          user ? (
             <Layout>
               <ProfilePage />
             </Layout>
-          </ProtectedRoute>
+          ) : (
+            <Navigate to="/login" />
+          )
         }
       />
     </Routes>

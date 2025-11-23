@@ -94,20 +94,27 @@ export const AuthProvider = ({ children }) => {
   // Helper function to ensure user profile exists
   const ensureUserProfile = async (user) => {
     try {
+      console.log('🔍 Checking profile for user:', user.id)
+      
       // Check if profile exists
       const { data: existingProfile, error: fetchError } = await supabase
         .from('user_profiles')
         .select('id')
         .eq('user_id', user.id)
-        .single()
+        .maybeSingle()
 
-      if (fetchError && fetchError.code === 'PGRST116') {
+      if (fetchError) {
+        console.error('❌ Error checking profile:', fetchError)
+        return
+      }
+
+      if (!existingProfile) {
         // Profile doesn't exist, create it
         console.log('📝 Creating missing user profile for:', user.id)
         
         const phoneNumber = user.user_metadata?.phone_number || null
         
-        const { error: insertError } = await supabase
+        const { data: newProfile, error: insertError } = await supabase
           .from('user_profiles')
           .insert([
             {
@@ -115,13 +122,15 @@ export const AuthProvider = ({ children }) => {
               phone_number: phoneNumber,
             },
           ])
+          .select()
+          .single()
         
         if (insertError) {
           console.error('❌ Failed to create profile:', insertError)
         } else {
-          console.log('✅ User profile created successfully')
+          console.log('✅ User profile created successfully:', newProfile)
         }
-      } else if (existingProfile) {
+      } else {
         console.log('✅ User profile already exists')
       }
     } catch (error) {
@@ -137,7 +146,7 @@ export const AuthProvider = ({ children }) => {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/complete-profile`,
+          emailRedirectTo: `${window.location.origin}/dashboard`,
           data: {
             phone_number: phoneNumber, // Store in user metadata as fallback
           }
@@ -151,8 +160,29 @@ export const AuthProvider = ({ children }) => {
 
       console.log('✅ User created in auth.users:', data.user?.id)
 
-      // DON'T create profile here - let user complete profile form
-      console.log('ℹ️ User will complete profile in next step')
+      // Create user profile immediately (email confirmation disabled)
+      if (data.user) {
+        console.log('📝 Creating user profile...')
+        try {
+          const { error: profileError } = await supabase
+            .from('user_profiles')
+            .insert([
+              {
+                user_id: data.user.id,
+                phone_number: phoneNumber,
+              },
+            ])
+          
+          if (profileError) {
+            console.warn('⚠️ Profile creation error:', profileError.message)
+            // Don't throw - profile will be created on login
+          } else {
+            console.log('✅ User profile created successfully')
+          }
+        } catch (profileErr) {
+          console.warn('⚠️ Profile creation failed (will retry on login):', profileErr)
+        }
+      }
 
       return data
     } catch (error) {
@@ -218,13 +248,28 @@ export const AuthProvider = ({ children }) => {
       
       // Clear IndexedDB if Supabase uses it
       if (window.indexedDB) {
-        const dbs = await window.indexedDB.databases()
-        dbs.forEach(db => {
-          if (db.name && db.name.includes('supabase')) {
-            window.indexedDB.deleteDatabase(db.name)
-            console.log('  ✓ Deleted IndexedDB:', db.name)
-          }
-        })
+        try {
+          const dbs = await window.indexedDB.databases()
+          dbs.forEach(db => {
+            if (db.name && db.name.includes('supabase')) {
+              window.indexedDB.deleteDatabase(db.name)
+              console.log('  ✓ Deleted IndexedDB:', db.name)
+            }
+          })
+        } catch (e) {
+          console.warn('Could not clear IndexedDB:', e)
+        }
+      }
+      
+      // Clear Cache Storage
+      if ('caches' in window) {
+        try {
+          const cacheNames = await caches.keys()
+          await Promise.all(cacheNames.map(name => caches.delete(name)))
+          console.log('  ✓ Cleared all caches')
+        } catch (e) {
+          console.warn('Could not clear caches:', e)
+        }
       }
       
       console.log('✅ Complete sign out successful - all browser data cleared')

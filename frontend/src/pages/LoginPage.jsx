@@ -36,8 +36,8 @@ export default function LoginPage() {
         
         // With email confirmation disabled, we should get a session immediately
         if (result.session) {
-          console.log('✅ Signup complete with session, navigating to profile completion')
-          navigate('/complete-profile')
+          console.log('✅ Signup complete with session, navigating to dashboard')
+          navigate('/dashboard')
         } else if (result.user) {
           // Fallback: no session means confirmation is still required
           setError('✅ Account created! Please check your email to verify your account.')

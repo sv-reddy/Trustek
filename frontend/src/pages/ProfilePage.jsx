@@ -31,8 +31,7 @@ export default function ProfilePage() {
 
   const fetchProfile = async () => {
     try {
-      console.log('👤 Fetching user profile for:', user.id)
-      
+      console.log('🔍 Checking profile for user:', user.id)
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -40,12 +39,32 @@ export default function ProfilePage() {
         .single()
 
       if (error) {
-        console.error('❌ Profile fetch error:', error)
-        throw error
+        if (error.code === 'PGRST116') {
+          // No profile found - create one
+          console.log('📝 No profile found, creating one...')
+          const { data: newProfile, error: insertError } = await supabase
+            .from('user_profiles')
+            .insert([{
+              user_id: user.id,
+              phone_number: user.user_metadata?.phone_number || null,
+            }])
+            .select()
+            .single()
+          
+          if (insertError) {
+            console.error('❌ Failed to create profile:', insertError)
+            throw insertError
+          }
+          
+          console.log('✅ Profile created successfully')
+          setProfile(newProfile)
+        } else {
+          throw error
+        }
+      } else {
+        console.log('✅ Profile loaded successfully')
+        setProfile(data)
       }
-      
-      console.log('✅ Profile data loaded')
-      setProfile(data)
       
       // Initialize edit values with current profile data
       setEditValues({
@@ -64,7 +83,7 @@ export default function ProfilePage() {
         trading_pairs: data?.trading_pairs || ['ETH/USDC', 'STRK/ETH']
       })
     } catch (error) {
-      console.error('💥 Error fetching profile:', error)
+      console.error('Error fetching profile:', error)
     } finally {
       setLoading(false)
     }
@@ -72,49 +91,28 @@ export default function ProfilePage() {
 
   const fetchSessionKeys = async () => {
     try {
-      console.log('🔑 Fetching session keys for user:', user.id)
-      
       const { data, error } = await supabase
         .from('session_keys')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
-      if (error) {
-        console.error('❌ Session keys fetch error:', error)
-        throw error
-      }
-      
-      console.log('✅ Session keys loaded:', data?.length || 0)
+      if (error) throw error
       setSessionKeys(data || [])
     } catch (error) {
-      console.error('💥 Error fetching session keys:', error)
-      setSessionKeys([])
+      console.error('Error fetching session keys:', error)
     }
   }
 
   const fetchPortfolioData = async () => {
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000'
-      console.log('📊 Fetching portfolio data from:', backendUrl)
-      
-      const response = await fetch(`${backendUrl}/api/portfolio?user_id=${user.id}`)
-      
-      if (!response.ok) {
-        console.warn('⚠️ Portfolio API returned:', response.status)
-        setPortfolioData(null)
-        return
-      }
-      
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/portfolio?user_id=${user.id}`)
       const result = await response.json()
       if (result.success) {
         setPortfolioData(result.data)
-        console.log('✅ Portfolio data loaded')
       }
     } catch (error) {
-      console.warn('⚠️ Portfolio fetch failed (non-critical):', error.message)
-      // Don't block profile page if portfolio API fails
-      setPortfolioData(null)
+      console.error('Error fetching portfolio:', error)
     }
   }
 
