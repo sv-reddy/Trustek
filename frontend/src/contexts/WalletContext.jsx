@@ -21,44 +21,166 @@ export const WalletProvider = ({ children }) => {
   const [account, setAccount] = useState(null)
   const [address, setAddress] = useState(() => localStorage.getItem('starknet_address') || '')
   const [isConnecting, setIsConnecting] = useState(false)
-  
-  // MetaMask (Ethereum) wallet state
-  const [metamaskAccount, setMetamaskAccount] = useState(null)
-  const [metamaskAddress, setMetamaskAddress] = useState('')
-  const [isMetamaskConnecting, setIsMetamaskConnecting] = useState(false)
 
   const connectWallet = async () => {
     try {
       setIsConnecting(true)
-      const { wallet } = await connect({
+      console.log('🔄 Connecting wallet...')
+      
+      // Check if starknetkit is available
+      if (typeof connect !== 'function') {
+        throw new Error('StarknetKit not loaded properly. Please refresh the page.')
+      }
+
+      const result = await connect({
         modalMode: 'alwaysAsk',
         modalTheme: 'dark',
         dappName: 'TrusTek Fusion',
-        chainId: 'KATANA',
+        webWalletUrl: 'https://web.argent.xyz',
+        argentMobileOptions: {
+          dappName: 'TrusTek Fusion',
+          url: window.location.hostname,
+        },
       })
 
-      if (wallet?.isConnected) {
-        setConnection(wallet)
-        setAccount(wallet.account)
-        setAddress(wallet.selectedAddress)
-        
-        // Persist to localStorage
-        localStorage.setItem('starknet_address', wallet.selectedAddress)
-        localStorage.setItem('wallet_connected', 'true')
+      console.log('📦 Connection result received')
+      
+      const { wallet } = result
 
-        console.log('✅ Wallet connected:', wallet.selectedAddress)
+      if (!wallet) {
+        throw new Error('No wallet returned. Connection may have been cancelled.')
+      }
 
-        // Save wallet address to user profile
-        if (user) {
-          await supabase
-            .from('user_profiles')
-            .update({ starknet_address: wallet.selectedAddress })
-            .eq('user_id', user.id)
+      console.log('📦 Wallet object received')
+      console.log('📦 Wallet keys:', Object.keys(wallet))
+      console.log('📦 Wallet.id:', wallet.id)
+      console.log('📦 Wallet.name:', wallet.name)
+      console.log('📦 Wallet.icon:', wallet.icon)
+      console.log('📦 Wallet.selectedAddress:', wallet.selectedAddress)
+      console.log('📦 Wallet.account exists:', !!wallet.account)
+      
+      if (wallet.account) {
+        console.log('📦 Account type:', typeof wallet.account)
+        console.log('📦 Account keys:', Object.keys(wallet.account))
+        console.log('📦 Account.address:', wallet.account.address)
+      }
+
+      // Try to get address from multiple possible locations
+      let walletAddress = null
+      
+      // Method 1: selectedAddress
+      if (wallet.selectedAddress) {
+        walletAddress = wallet.selectedAddress
+        console.log('✅ Found address via selectedAddress:', walletAddress)
+      }
+      // Method 2: account.address
+      else if (wallet.account && wallet.account.address) {
+        walletAddress = wallet.account.address
+        console.log('✅ Found address via account.address:', walletAddress)
+      }
+      // Method 3: direct address property
+      else if (wallet.address) {
+        walletAddress = wallet.address
+        console.log('✅ Found address via address:', walletAddress)
+      }
+      // Method 4: Check if account itself is a string (some wallets do this)
+      else if (typeof wallet.account === 'string') {
+        walletAddress = wallet.account
+        console.log('✅ Found address via account string:', walletAddress)
+      }
+      // Method 5: Try calling getAddress if it's a function
+      else if (wallet.account && typeof wallet.account.getAddress === 'function') {
+        try {
+          walletAddress = await wallet.account.getAddress()
+          console.log('✅ Found address via getAddress():', walletAddress)
+        } catch (e) {
+          console.warn('⚠️ getAddress() failed:', e)
         }
       }
+      // Method 6: Try the enable method to get accounts
+      else if (typeof wallet.enable === 'function') {
+        try {
+          const accounts = await wallet.enable()
+          if (accounts && accounts.length > 0) {
+            walletAddress = accounts[0]
+            console.log('✅ Found address via enable():', walletAddress)
+          }
+        } catch (e) {
+          console.warn('⚠️ enable() failed:', e)
+        }
+      }
+      
+      if (!walletAddress) {
+        console.error('❌ Could not find wallet address')
+        console.error('Available wallet properties:', Object.keys(wallet))
+        if (wallet.account) {
+          console.error('Available account properties:', Object.keys(wallet.account))
+          // Try to log account values without serializing BigInt
+          for (const key of Object.keys(wallet.account)) {
+            try {
+              const value = wallet.account[key]
+              if (typeof value !== 'function' && typeof value !== 'bigint') {
+                console.error(`  ${key}:`, value)
+              } else {
+                console.error(`  ${key}: [${typeof value}]`)
+              }
+            } catch (e) {
+              console.error(`  ${key}: [error reading]`)
+            }
+          }
+        }
+        throw new Error('Could not retrieve wallet address. Please ensure your wallet is unlocked and try again.')
+      }
+      
+      // Normalize address (remove any whitespace, ensure it's a string)
+      walletAddress = String(walletAddress).trim()
+      
+      console.log('📍 Final wallet address:', walletAddress)
+      
+      // Set wallet state
+      setConnection(wallet)
+      setAccount(wallet.account)
+      setAddress(walletAddress)
+      
+      // Persist to localStorage
+      localStorage.setItem('starknet_address', walletAddress)
+      localStorage.setItem('wallet_connected', 'true')
+
+      console.log('✅ Wallet connected successfully!')
+
+      // Save wallet address to user profile (non-blocking)
+      if (user) {
+        setTimeout(async () => {
+          try {
+            await supabase
+              .from('user_profiles')
+              .update({ starknet_address: walletAddress })
+              .eq('user_id', user.id)
+            console.log('✅ Saved to database')
+          } catch (dbError) {
+            console.warn('⚠️ Failed to save to database:', dbError)
+          }
+        }, 100)
+      }
+      
+      return wallet
     } catch (error) {
-      console.error('Failed to connect wallet:', error)
+      console.error('❌ Failed to connect wallet:', error)
+      console.error('❌ Error message:', error.message)
+      // Clean up on error
+      setConnection(null)
+      setAccount(null)
+      setAddress('')
       localStorage.removeItem('wallet_connected')
+      localStorage.removeItem('starknet_address')
+      
+      // Re-throw with more user-friendly message
+      if (error.message?.includes('User rejected') || error.message?.includes('User abort')) {
+        throw new Error('Connection cancelled by user')
+      }
+      if (error.message?.includes('BigInt')) {
+        throw new Error('Wallet connection succeeded but there was an internal error. Please refresh the page and try again.')
+      }
       throw error
     } finally {
       setIsConnecting(false)
@@ -80,87 +202,13 @@ export const WalletProvider = ({ children }) => {
     }
   }
 
-  const connectMetaMask = async () => {
-    try {
-      setIsMetamaskConnecting(true)
-      
-      if (typeof window.ethereum === 'undefined') {
-        throw new Error('MetaMask is not installed. Please install MetaMask extension.')
-      }
 
-      // Request account access
-      const accounts = await window.ethereum.request({ 
-        method: 'eth_requestAccounts' 
-      })
-      
-      const account = accounts[0]
-      setMetamaskAccount(account)
-      setMetamaskAddress(account)
-      
-      // Persist to localStorage
-      localStorage.setItem('metamask_address', account)
-
-      // Get network info
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' })
-      console.log('Connected to chain:', chainId)
-
-      // Save MetaMask address to user profile
-      if (user) {
-        await supabase
-          .from('user_profiles')
-          .update({ ethereum_address: account })
-          .eq('user_id', user.id)
-      }
-
-      // Listen for account changes
-      window.ethereum.on('accountsChanged', (accounts) => {
-        if (accounts.length === 0) {
-          setMetamaskAccount(null)
-          setMetamaskAddress('')
-        } else {
-          setMetamaskAccount(accounts[0])
-          setMetamaskAddress(accounts[0])
-        }
-      })
-
-      // Listen for chain changes
-      window.ethereum.on('chainChanged', () => {
-        window.location.reload()
-      })
-
-      return account
-    } catch (error) {
-      console.error('Failed to connect MetaMask:', error)
-      throw error
-    } finally {
-      setIsMetamaskConnecting(false)
-    }
-  }
-
-  const disconnectMetaMask = () => {
-    setMetamaskAccount(null)
-    setMetamaskAddress('')
-    localStorage.removeItem('metamask_address')
-  }
-
-  const switchEthereumNetwork = async (chainId) => {
-    try {
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId }],
-      })
-    } catch (error) {
-      console.error('Failed to switch network:', error)
-      throw error
-    }
-  }
 
   // Auto-connect wallet on mount if previously connected
   useEffect(() => {
     const autoConnect = async () => {
       const savedAddress = localStorage.getItem('starknet_address')
       const wasConnected = localStorage.getItem('wallet_connected')
-      const savedMetamask = localStorage.getItem('metamask_address')
       
       if (savedAddress && wasConnected === 'true' && !address && !isConnecting) {
         try {
@@ -169,14 +217,16 @@ export const WalletProvider = ({ children }) => {
             modalMode: 'neverAsk',
             modalTheme: 'dark',
             dappName: 'TrusTek Fusion',
-            chainId: 'KATANA',
           })
 
-          if (wallet?.isConnected) {
+          if (wallet && wallet.isConnected) {
             setConnection(wallet)
             setAccount(wallet.account)
-            setAddress(wallet.selectedAddress)
-            console.log('✅ Auto-connected to:', wallet.selectedAddress)
+            const walletAddress = wallet.selectedAddress || wallet.account?.address
+            if (walletAddress) {
+              setAddress(walletAddress)
+              console.log('✅ Auto-connected to:', walletAddress)
+            }
           } else {
             console.log('⚠️ Auto-connect failed - wallet not connected')
             localStorage.removeItem('starknet_address')
@@ -184,26 +234,7 @@ export const WalletProvider = ({ children }) => {
           }
         } catch (error) {
           console.log('❌ Auto-connect failed:', error.message)
-          localStorage.removeItem('starknet_address')
-          localStorage.removeItem('wallet_connected')
-        }
-      }
-      
-      if (savedMetamask && !metamaskAddress && !isMetamaskConnecting) {
-        try {
-          if (typeof window.ethereum !== 'undefined') {
-            const accounts = await window.ethereum.request({ method: 'eth_accounts' })
-            if (accounts.length > 0) {
-              setMetamaskAccount(accounts[0])
-              setMetamaskAddress(accounts[0])
-              console.log('✅ Auto-connected to MetaMask:', accounts[0])
-            } else {
-              localStorage.removeItem('metamask_address')
-            }
-          }
-        } catch (error) {
-          console.log('❌ MetaMask auto-connect failed:', error)
-          localStorage.removeItem('metamask_address')
+          // Don't clear localStorage on auto-connect failure - user might need to manually connect
         }
       }
     }
@@ -231,7 +262,6 @@ export const WalletProvider = ({ children }) => {
   }
 
   const value = {
-    // Starknet wallet
     connection,
     account,
     address,
@@ -239,14 +269,6 @@ export const WalletProvider = ({ children }) => {
     connectWallet,
     disconnectWallet,
     createSessionKey,
-    
-    // MetaMask (Ethereum) wallet
-    metamaskAccount,
-    metamaskAddress,
-    isMetamaskConnecting,
-    connectMetaMask,
-    disconnectMetaMask,
-    switchEthereumNetwork,
   }
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>

@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Mic } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Shield } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function LoginPage() {
-  const [isLogin, setIsLogin] = useState(true)
+  const [searchParams] = useSearchParams()
+  const [isLogin, setIsLogin] = useState(!searchParams.get('signup'))
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
@@ -23,7 +24,7 @@ export default function LoginPage() {
       if (isLogin) {
         const result = await signIn(email, password)
         console.log('Login successful:', result)
-        navigate('/')
+        navigate('/dashboard')
       } else {
         if (!phoneNumber) {
           setError('Phone number is required for registration')
@@ -33,14 +34,15 @@ export default function LoginPage() {
         const result = await signUp(email, password, phoneNumber)
         console.log('Signup successful:', result)
         
-        // Show success message for email confirmation
-        if (result.user && !result.session) {
-          setError('Account created! Please check your email to verify your account.')
-          setLoading(false)
-          return
+        // With email confirmation disabled, we should get a session immediately
+        if (result.session) {
+          console.log('✅ Signup complete with session, navigating to dashboard')
+          navigate('/dashboard')
+        } else if (result.user) {
+          // Fallback: no session means confirmation is still required
+          setError('✅ Account created! Please check your email to verify your account.')
+          setIsLogin(true)
         }
-        
-        navigate('/')
       }
     } catch (err) {
       console.error('Auth error:', err)
@@ -49,11 +51,15 @@ export default function LoginPage() {
       if (err.message?.includes('Invalid login credentials')) {
         setError('Invalid email or password. Please check your credentials and try again.')
       } else if (err.message?.includes('Email not confirmed')) {
-        setError('Please verify your email address before logging in.')
+        setError('Please verify your email address. Check your inbox for the confirmation link.')
       } else if (err.message?.includes('User already registered')) {
         setError('This email is already registered. Please login instead.')
       } else if (err.message?.includes('Password should be at least')) {
         setError('Password must be at least 6 characters long.')
+      } else if (err.message?.includes('Unable to validate email')) {
+        setError('Invalid email format. Please check your email address.')
+      } else if (err.message?.includes('signup disabled')) {
+        setError('Signups are currently disabled. Please contact support.')
       } else {
         setError(err.message || 'Authentication failed. Please try again.')
       }
@@ -68,7 +74,7 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <div className="bg-primary-600 p-4 rounded-full">
-              <Mic className="h-12 w-12 text-white" />
+              <Shield className="h-12 w-12 text-white" />
             </div>
           </div>
           <h1 className="text-4xl font-bold text-white mb-2">TrusTek Fusion</h1>

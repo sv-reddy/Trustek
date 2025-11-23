@@ -128,43 +128,18 @@ export default function TokenPortfolio() {
 
   return (
     <div className="space-y-6">
-      {/* Wallet Connection Status */}
-      {address ? (
-        <div className="bg-gradient-to-br from-blue-600/20 to-purple-600/20 backdrop-blur-sm border border-blue-500/30 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500/20 rounded-lg relative">
-                <Wallet className="w-6 h-6 text-blue-400" />
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-800"></div>
+      {/* Token List */}
+      <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-xl overflow-hidden">
+        <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-white">Token Holdings</h3>
+          <div className="flex items-center gap-3">
+            {totalValue > 0 && (
+              <div className="text-right">
+                <p className="text-sm text-gray-400">Total Value</p>
+                <p className="text-xl font-bold text-white">{formatCurrency(totalValue)}</p>
               </div>
-              <div>
-                <p className="text-sm text-gray-400">Connected Wallet <span className="text-green-500">● Active</span></p>
-                <div className="flex items-center gap-2">
-                  <code className="text-white font-mono">{formatAddress(address)}</code>
-                  <button
-                    onClick={copyAddress}
-                    className="p-1 hover:bg-gray-700/50 rounded transition-colors"
-                    title="Copy address"
-                  >
-                    {copiedAddress ? (
-                      <Check className="w-4 h-4 text-green-400" />
-                    ) : (
-                      <Copy className="w-4 h-4 text-gray-400" />
-                    )}
-                  </button>
-                  <a
-                    href={`https://voyager.online/contract/${address}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-1 hover:bg-gray-700/50 rounded transition-colors"
-                    title="View on Voyager"
-                  >
-                    <ExternalLink className="w-4 h-4 text-gray-400" />
-                  </a>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
+            )}
+            {address && (
               <button
                 onClick={() => fetchTokens(true)}
                 disabled={loading}
@@ -173,84 +148,15 @@ export default function TokenPortfolio() {
               >
                 <RefreshCw className={`w-5 h-5 text-blue-400 ${loading ? 'animate-spin' : ''}`} />
               </button>
-              <button
-                onClick={handleDisconnectWallet}
-                className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors text-sm font-medium"
-              >
-                Disconnect
-              </button>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-gray-700/50">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-400 mb-1">Total Portfolio Value</p>
-                <h2 className="text-3xl font-bold text-white">{formatCurrency(totalValue)}</h2>
-              </div>
-              {lastPriceFetch > 0 && (
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">Last updated</p>
-                  <p className="text-sm text-gray-400">{new Date(lastPriceFetch).toLocaleTimeString()}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-gradient-to-br from-blue-600/10 to-purple-600/10 backdrop-blur-sm border border-blue-500/20 rounded-xl p-8 text-center">
-          <div className="mb-6">
-            <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Wallet className="w-8 h-8 text-blue-400" />
-            </div>
-            <h3 className="text-xl font-bold text-white mb-2">Connect Your Wallet</h3>
-            <p className="text-gray-400 mb-4">Connect ArgentX or Braavos to view and manage your tokens</p>
-          </div>
-          
-          {walletError && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-              <p className="text-red-400 text-sm">{walletError}</p>
-              <p className="text-xs text-gray-400 mt-1">
-                Make sure Katana is running and the custom network is configured in your wallet
-              </p>
-            </div>
-          )}
-          
-          <button
-            onClick={handleConnectWallet}
-            disabled={isConnecting}
-            className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
-          >
-            {isConnecting ? (
-              <>
-                <RefreshCw className="w-5 h-5 animate-spin" />
-                Connecting...
-              </>
-            ) : (
-              <>
-                <Wallet className="w-5 h-5" />
-                Connect Wallet
-              </>
             )}
-          </button>
-          
-          <p className="text-xs text-gray-500 mt-4">
-            Make sure you have ArgentX or Braavos wallet extension installed
-          </p>
+          </div>
         </div>
-      )}
 
-      {/* Token List */}
-      <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-xl overflow-hidden">
-        <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white">Token Holdings</h3>
-          {totalValue > 0 && (
-            <div className="text-right">
-              <p className="text-sm text-gray-400">Total Value</p>
-              <p className="text-xl font-bold text-white">{formatCurrency(totalValue)}</p>
-            </div>
-          )}
-        </div>
+        {walletError && (
+          <div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+            <p className="text-red-400 text-sm">{walletError}</p>
+          </div>
+        )}
 
         {loading ? (
           <div className="p-8 text-center">

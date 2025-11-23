@@ -10,9 +10,43 @@ export default function Layout({ children }) {
   const { address, disconnectWallet } = useWallet()
 
   const handleLogout = async () => {
-    await disconnectWallet()
-    await signOut()
-    navigate('/login')
+    try {
+      console.log('🚪 Starting complete logout...')
+      
+      // Step 1: Sign out from Supabase (clears server session)
+      await signOut()
+      
+      // Step 2: Clear all browser storage manually (belt and suspenders approach)
+      console.log('🧹 Force clearing all browser storage...')
+      localStorage.clear()
+      sessionStorage.clear()
+      
+      // Step 3: Clear all Supabase-related cookies
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
+      })
+      
+      console.log('✅ Complete logout successful!')
+      console.log('🔄 Forcing page reload to clear all state...')
+      
+      // Step 4: Force complete page reload from server (not cache)
+      window.location.replace('/login')
+      
+      // Additional fallback - reload after a brief moment
+      setTimeout(() => {
+        window.location.href = '/login'
+        window.location.reload(true)
+      }, 100)
+      
+    } catch (error) {
+      console.error('💥 Logout error:', error)
+      // Force logout even on error
+      localStorage.clear()
+      sessionStorage.clear()
+      window.location.replace('/login')
+    }
   }
 
   return (
@@ -28,9 +62,9 @@ export default function Layout({ children }) {
 
             <nav className="flex items-center space-x-4">
               <Link
-                to="/"
+                to="/dashboard"
                 className={`px-3 py-2 rounded-md text-sm font-medium ${
-                  location.pathname === '/'
+                  location.pathname === '/dashboard'
                     ? 'bg-dark-700 text-white'
                     : 'text-gray-300 hover:bg-dark-700 hover:text-white'
                 }`}

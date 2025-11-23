@@ -11,7 +11,7 @@ import {
 
 export default function ProfilePage() {
   const { user } = useAuth()
-  const { address, connectWallet, createSessionKey, isConnecting } = useWallet()
+  const { address, connectWallet, disconnectWallet, createSessionKey, isConnecting } = useWallet()
   const [profile, setProfile] = useState(null)
   const [sessionKeys, setSessionKeys] = useState([])
   const [loading, setLoading] = useState(true)
@@ -291,7 +291,56 @@ export default function ProfilePage() {
           </h2>
           <div className="space-y-3">
             <InfoField label="User ID" value={user?.id} icon={Shield} copyable />
-            <InfoField label="Starknet Wallet Address" value={address || profile?.starknet_address} icon={Wallet} copyable />
+            
+            {/* Wallet Connection Management */}
+            <div className="p-4 bg-dark-700/50 rounded-lg">
+              <div className="flex items-center gap-3 mb-2">
+                <Wallet className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm text-gray-400 mb-1">Starknet Wallet</p>
+                  {address ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <p className="text-white font-mono text-sm break-all">{address}</p>
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">Not connected</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                {address ? (
+                  <button
+                    onClick={async () => {
+                      if (confirm('Are you sure you want to disconnect your wallet? You can reconnect anytime.')) {
+                        await disconnectWallet()
+                        alert('Wallet disconnected successfully')
+                      }
+                    }}
+                    className="flex-1 px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-sm font-medium"
+                  >
+                    Disconnect Wallet
+                  </button>
+                ) : (
+                  <button
+                    onClick={connectWallet}
+                    disabled={isConnecting}
+                    className="flex-1 px-4 py-2 bg-primary-500/20 text-primary-400 rounded-lg hover:bg-primary-500/30 transition-colors text-sm font-medium disabled:opacity-50"
+                  >
+                    {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+                  </button>
+                )}
+                {address && (
+                  <button
+                    onClick={() => copyToClipboard(address)}
+                    className="p-2 text-primary-500 hover:bg-primary-500/20 rounded"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+            
             <EditableField label="Registered Phone Number" field="phone_number" value={editValues.phone_number} type="tel" icon={Phone} />
             <InfoField 
               label="Phone Verification Status" 

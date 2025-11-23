@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
+import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
 import ProfilePage from './pages/ProfilePage'
@@ -18,9 +19,10 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" /> : <LoginPage />} />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginPage />} />
       <Route
-        path="/"
+        path="/dashboard"
         element={
           user ? (
             <Layout>

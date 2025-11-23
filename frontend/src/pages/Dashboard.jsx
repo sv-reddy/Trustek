@@ -2,19 +2,20 @@ import { useState, useEffect } from 'react'
 import { 
   TrendingUp, TrendingDown, Activity, AlertCircle, Zap, PieChart, Wallet,
   Lock, Shield, CheckCircle, Eye, BarChart3, TrendingUp as TrendingUpIcon, 
-  DollarSign, Gauge, Flame, Wind, User, Bell, Smartphone, Mail, Search
+  DollarSign, Gauge, Flame, Wind, User, Bell, Smartphone, Mail, Search, RefreshCw
 } from 'lucide-react'
 import PortfolioDashboard from '../components/PortfolioDashboard'
 import TokenPortfolio from '../components/TokenPortfolio'
 import { useWallet } from '../contexts/WalletContext'
 
 export default function Dashboard() {
-  const { address, connectWallet, isConnecting } = useWallet()
+  const { address, connectWallet, disconnectWallet, isConnecting } = useWallet()
   const [activeTab, setActiveTab] = useState('overview')
   const [refreshTime, setRefreshTime] = useState(new Date())
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [isSearching, setIsSearching] = useState(false)
+  const [walletError, setWalletError] = useState(null)
 
   // Portfolio Overview State
   const [portfolioData, setPortfolioData] = useState({
@@ -509,11 +510,65 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-400">Last Update</p>
-          <p className="text-xs text-gray-500">{refreshTime.toLocaleTimeString()}</p>
+        <div className="flex items-center gap-3">
+          {!address ? (
+            <button
+              onClick={async () => {
+                try {
+                  setWalletError(null)
+                  await connectWallet()
+                } catch (error) {
+                  console.error('Wallet connection error:', error)
+                  setWalletError(error.message || 'Failed to connect wallet')
+                }
+              }}
+              disabled={isConnecting}
+              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+            >
+              {isConnecting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <Wallet className="w-4 h-4" />
+                  Connect Wallet
+                </>
+              )}
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <code className="text-sm text-green-400 font-mono">
+                {address.slice(0, 6)}...{address.slice(-4)}
+              </code>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Wallet Error Display */}
+      {walletError && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-red-400 font-semibold">Wallet Connection Error</p>
+              <p className="text-sm text-gray-300 mt-1">{walletError}</p>
+              <p className="text-xs text-gray-400 mt-2">
+                Make sure you have ArgentX or Braavos wallet extension installed and try again.
+              </p>
+            </div>
+            <button
+              onClick={() => setWalletError(null)}
+              className="ml-auto text-gray-400 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="grid grid-cols-3 gap-2 border-b border-dark-700 pb-2">
@@ -714,13 +769,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Portfolio Overview Component */}
-      {activeTab === 'overview' && (
-        <div className="space-y-8">
-          <PortfolioDashboard />
         </div>
       )}
     </div>
