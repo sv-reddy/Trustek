@@ -137,7 +137,7 @@ export const AuthProvider = ({ children }) => {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: `${window.location.origin}/complete-profile`,
           data: {
             phone_number: phoneNumber, // Store in user metadata as fallback
           }
@@ -151,29 +151,8 @@ export const AuthProvider = ({ children }) => {
 
       console.log('✅ User created in auth.users:', data.user?.id)
 
-      // Create user profile immediately (email confirmation disabled)
-      if (data.user) {
-        console.log('📝 Creating user profile...')
-        try {
-          const { error: profileError } = await supabase
-            .from('user_profiles')
-            .insert([
-              {
-                user_id: data.user.id,
-                phone_number: phoneNumber,
-              },
-            ])
-          
-          if (profileError) {
-            console.warn('⚠️ Profile creation error:', profileError.message)
-            // Don't throw - profile will be created on login
-          } else {
-            console.log('✅ User profile created successfully')
-          }
-        } catch (profileErr) {
-          console.warn('⚠️ Profile creation failed (will retry on login):', profileErr)
-        }
-      }
+      // DON'T create profile here - let user complete profile form
+      console.log('ℹ️ User will complete profile in next step')
 
       return data
     } catch (error) {

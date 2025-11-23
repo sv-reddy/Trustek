@@ -31,13 +31,20 @@ export default function ProfilePage() {
 
   const fetchProfile = async () => {
     try {
+      console.log('👤 Fetching user profile for:', user.id)
+      
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('user_id', user.id)
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Profile fetch error:', error)
+        throw error
+      }
+      
+      console.log('✅ Profile data loaded')
       setProfile(data)
       
       // Initialize edit values with current profile data
@@ -57,7 +64,7 @@ export default function ProfilePage() {
         trading_pairs: data?.trading_pairs || ['ETH/USDC', 'STRK/ETH']
       })
     } catch (error) {
-      console.error('Error fetching profile:', error)
+      console.error('💥 Error fetching profile:', error)
     } finally {
       setLoading(false)
     }
@@ -65,28 +72,49 @@ export default function ProfilePage() {
 
   const fetchSessionKeys = async () => {
     try {
+      console.log('🔑 Fetching session keys for user:', user.id)
+      
       const { data, error } = await supabase
         .from('session_keys')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Session keys fetch error:', error)
+        throw error
+      }
+      
+      console.log('✅ Session keys loaded:', data?.length || 0)
       setSessionKeys(data || [])
     } catch (error) {
-      console.error('Error fetching session keys:', error)
+      console.error('💥 Error fetching session keys:', error)
+      setSessionKeys([])
     }
   }
 
   const fetchPortfolioData = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/portfolio?user_id=${user.id}`)
+      const backendUrl = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000'
+      console.log('📊 Fetching portfolio data from:', backendUrl)
+      
+      const response = await fetch(`${backendUrl}/api/portfolio?user_id=${user.id}`)
+      
+      if (!response.ok) {
+        console.warn('⚠️ Portfolio API returned:', response.status)
+        setPortfolioData(null)
+        return
+      }
+      
       const result = await response.json()
       if (result.success) {
         setPortfolioData(result.data)
+        console.log('✅ Portfolio data loaded')
       }
     } catch (error) {
-      console.error('Error fetching portfolio:', error)
+      console.warn('⚠️ Portfolio fetch failed (non-critical):', error.message)
+      // Don't block profile page if portfolio API fails
+      setPortfolioData(null)
     }
   }
 
