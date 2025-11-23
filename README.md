@@ -94,6 +94,59 @@ Build/
 └──────────────────────────────────────────────────────┘
 ```
 
+---
+
+## 🚀 Quick Start
+
+### For Users (Non-Technical)
+
+If you just want to **use** the web application:
+
+1. **Access the App**: Visit the deployed URL or run locally (see below)
+2. **Sign Up**: Create an account with email and password
+3. **Connect Wallet**: Install ArgentX and connect your Starknet wallet
+4. **Start Trading**: Create session keys and let AI manage your portfolio
+
+📖 **See [USER_GUIDE.md](USER_GUIDE.md) for complete step-by-step instructions**
+
+### For Developers (Quick Setup)
+
+Want to run locally in **5 minutes**?
+
+```powershell
+# 1. Clone the repository
+git clone <your-repo-url>
+cd Build
+
+# 2. Setup Backend
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+# Create backend/.env with required variables (see Backend Setup below)
+python main.py  # Runs on http://localhost:8000
+
+# 3. Setup Frontend (in new terminal)
+cd frontend
+npm install
+
+# Create frontend/.env with required variables (see Frontend Setup below)
+npm run dev  # Runs on http://localhost:5173
+
+# 4. Access the app
+# Open http://localhost:5173 in your browser
+```
+
+**Required Services:**
+- ✅ Supabase account (for database and authentication)
+- ✅ Google Gemini API key (for AI predictions)
+- ⚠️ Starknet devnet (optional, for blockchain features)
+
+📖 **See detailed setup instructions below**
+
+---
+
 ## 🛠️ Complete Setup Guide
 
 ### Prerequisites
@@ -660,6 +713,438 @@ SECRET_KEY=your_secret_key
 
 ## 📚 Additional Resources
 
+- [Starknet Documentation](https://docs.starknet.io)
+- [Supabase Documentation](https://supabase.com/docs)
+- [Gemini API Documentation](https://ai.google.dev/docs)
+- [FastAPI Documentation](https://fastapi.tiangolo.com)
+- [React + Vite Documentation](https://vitejs.dev/guide)
+
+---
+
+## 🛠️ Troubleshooting
+
+### Common Issues & Solutions
+
+#### 1. **Frontend won't start - "Cannot find module"**
+
+**Error:**
+```
+Error: Cannot find module 'vite'
+```
+
+**Solution:**
+```powershell
+cd frontend
+Remove-Item node_modules -Recurse -Force
+Remove-Item package-lock.json
+npm install
+npm run dev
+```
+
+#### 2. **Backend won't start - "ModuleNotFoundError"**
+
+**Error:**
+```
+ModuleNotFoundError: No module named 'fastapi'
+```
+
+**Solution:**
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+pip install --upgrade pip
+pip install -r requirements.txt
+python main.py
+```
+
+#### 3. **Login fails - "Invalid credentials"**
+
+**Possible Causes:**
+- Email not confirmed in Supabase
+- User profile not created
+- Wrong email/password
+
+**Solution:**
+```sql
+-- Run in Supabase SQL Editor:
+UPDATE auth.users 
+SET confirmed_at = NOW(), email_confirmed_at = NOW() 
+WHERE email = 'your.email@example.com';
+
+-- Check if profile exists:
+SELECT * FROM user_profiles WHERE email = 'your.email@example.com';
+
+-- If not, profile will be auto-created on next login
+```
+
+#### 4. **Wallet won't connect**
+
+**Symptoms:**
+- ArgentX doesn't open
+- "Could not retrieve wallet address" in console
+
+**Solution:**
+1. Verify ArgentX extension is installed and unlocked
+2. Clear browser cache and reload
+3. Check console for detailed error messages
+4. Try disconnecting and reconnecting in ArgentX settings
+5. Update ArgentX to latest version
+
+**Console Logs to Check:**
+```
+Look for: "🔌 Connecting to wallet..."
+Should see: "✅ Wallet connected successfully"
+```
+
+#### 5. **Prices not loading**
+
+**Symptoms:**
+- Token table shows "N/A" for prices
+- Console shows fetch errors
+
+**Solution:**
+```powershell
+# 1. Verify backend is running
+curl http://localhost:8000/health
+
+# 2. Check Yahoo Finance endpoint
+curl http://localhost:8000/api/portfolio/tokens
+
+# 3. Clear price cache
+# In browser console:
+localStorage.removeItem('yahooFinancePrices');
+location.reload();
+
+# 4. Check backend logs for yfinance errors
+```
+
+#### 6. **Session key creation fails**
+
+**Error:**
+```
+"Please connect your wallet first"
+```
+
+**Solution:**
+1. Connect wallet first (Dashboard → Connect Wallet)
+2. Verify wallet has sufficient ETH for gas
+3. Check Starknet devnet is running:
+   ```powershell
+   curl http://192.168.137.128:5050
+   ```
+4. Check backend logs for contract deployment errors
+
+#### 7. **Logout doesn't work**
+
+**Symptoms:**
+- Can access dashboard after logout
+- Back button returns to previous page
+
+**Solution:**
+```javascript
+// Run in browser console:
+localStorage.clear();
+sessionStorage.clear();
+document.cookie.split(";").forEach((c) => {
+  document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+});
+location.replace('/login');
+```
+
+#### 8. **Database tables missing**
+
+**Error:**
+```
+relation "user_profiles" does not exist
+```
+
+**Solution:**
+```sql
+-- Run in Supabase SQL Editor:
+-- Copy entire contents of database/complete_schema.sql
+-- Paste and execute
+
+-- Or use quick setup:
+-- Copy contents of database/quick_setup.sql
+```
+
+#### 9. **CORS errors in browser console**
+
+**Error:**
+```
+Access to fetch at 'http://localhost:8000' from origin 'http://localhost:5173' 
+has been blocked by CORS policy
+```
+
+**Solution:**
+```python
+# In backend/main.py, verify CORS settings:
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Add your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+#### 10. **Starknet devnet connection fails**
+
+**Error:**
+```
+Connection refused to http://192.168.137.128:5050
+```
+
+**Solution:**
+```bash
+# On Ubuntu VM:
+starknet-devnet --host 0.0.0.0 --port 5050
+
+# Verify it's running:
+curl http://192.168.137.128:5050/is_alive
+# Should return: {"alive": true}
+
+# Check firewall:
+sudo ufw allow 5050
+```
+
+### Debugging Tips
+
+**Enable Detailed Logging:**
+
+Frontend (browser console):
+```javascript
+// Check current logs:
+console.log(localStorage);
+console.log(sessionStorage);
+
+// Monitor network requests:
+// Open DevTools (F12) → Network tab → Filter by "Fetch/XHR"
+```
+
+Backend (terminal):
+```python
+# In backend/main.py, add:
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+# Or set environment variable:
+# LOG_LEVEL=DEBUG python main.py
+```
+
+**Database Queries:**
+
+```sql
+-- Check user profiles
+SELECT * FROM user_profiles ORDER BY created_at DESC LIMIT 10;
+
+-- Check active session keys
+SELECT * FROM session_keys WHERE status = 'active';
+
+-- Check recent transactions
+SELECT * FROM transaction_log ORDER BY created_at DESC LIMIT 20;
+
+-- Check market data cache
+SELECT * FROM market_data WHERE updated_at > NOW() - INTERVAL '1 hour';
+
+-- Check user sessions
+SELECT * FROM user_sessions WHERE last_active > NOW() - INTERVAL '1 day';
+```
+
+**Reset Everything:**
+
+```powershell
+# Frontend
+cd frontend
+Remove-Item node_modules -Recurse -Force
+Remove-Item package-lock.json
+npm install
+
+# Backend
+cd backend
+Remove-Item .venv -Recurse -Force
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+# Database (Supabase SQL Editor)
+# Run: database/reset_database.sql
+# Then: database/complete_schema.sql
+
+# Browser
+# Clear all site data in DevTools → Application → Clear Storage
+```
+
+---
+
+## ❓ Frequently Asked Questions (FAQ)
+
+### General
+
+**Q: What is TrusTek Fusion?**  
+A: An AI-powered DeFi trading platform on Starknet that automates trading using session keys and Gemini AI predictions.
+
+**Q: Is it free to use?**  
+A: Yes, the platform is free. You only pay gas fees for blockchain transactions on Starknet.
+
+**Q: Which wallets are supported?**  
+A: Currently only **ArgentX** for Starknet. MetaMask is not supported.
+
+**Q: Can I use it on mobile?**  
+A: The web interface works on mobile browsers, but ArgentX mobile app integration is limited. Desktop use is recommended.
+
+### Account & Authentication
+
+**Q: Do I need to verify my email?**  
+A: No, email confirmation is **disabled** by default. You can login immediately after signup.
+
+**Q: I forgot my password, how do I reset it?**  
+A: Password reset feature is coming soon. Contact support with your registered email and phone number.
+
+**Q: Can I change my email address?**  
+A: No, email is your unique identifier and cannot be changed for security reasons.
+
+**Q: How do I delete my account?**  
+A: Account deletion feature is coming soon. You can revoke all session keys and disconnect your wallet as a temporary measure.
+
+### Wallet Connection
+
+**Q: Why only ArgentX? Why not MetaMask?**  
+A: TrusTek uses Starknet blockchain, which is not compatible with Ethereum-based wallets like MetaMask. ArgentX is the leading Starknet wallet.
+
+**Q: My wallet stays connected after logout. Is this normal?**  
+A: Yes, wallet connection persists until you manually disconnect it in Profile settings. This is for convenience so you don't have to reconnect every time.
+
+**Q: Can I connect multiple wallets?**  
+A: No, currently only one wallet per account is supported.
+
+**Q: I disconnected my wallet but can't reconnect**  
+A: Try refreshing the page, clearing browser cache, or restarting the ArgentX extension.
+
+### Prices & Market Data
+
+**Q: Where do prices come from?**  
+A: Real-time prices are fetched from **Yahoo Finance** API every 5 minutes.
+
+**Q: Why are prices cached for 5 minutes?**  
+A: To reduce API calls, improve performance, and prevent rate limiting.
+
+**Q: Can I change the refresh interval?**  
+A: Not currently, but you can manually refresh at any time using the refresh button.
+
+**Q: Which tokens are supported?**  
+A: Currently: ETH-USD, STRK-USD, BTC-USD, MATIC-USD. More tokens coming soon.
+
+### Session Keys & Trading
+
+**Q: What are session keys?**  
+A: Session keys allow the AI to execute trades on your behalf without requiring wallet approval for every transaction. Think of it as "limited power of attorney" for the AI.
+
+**Q: Are session keys safe?**  
+A: Yes, they have:
+- **Limited permissions** (can only trade, cannot withdraw)
+- **Expiration dates** (typically 30 days)
+- **Revocable** (you can revoke instantly)
+- **Specific trading pairs** (cannot trade arbitrary assets)
+
+**Q: How many session keys can I create?**  
+A: Unlimited, but only one active session key is recommended at a time.
+
+**Q: What happens when a session key expires?**  
+A: The AI can no longer use it for trading. You'll need to create a new session key to resume automated trading.
+
+**Q: Can I revoke a session key?**  
+A: Yes, go to Profile → Agent Authorization → click "Revoke" on any session key.
+
+**Q: Does the AI trade automatically?**  
+A: Yes, once you have an active session key, the AI monitors the market and executes trades based on Gemini predictions.
+
+### AI & Predictions
+
+**Q: Which AI model is used?**  
+A: **Gemini 2.5 Flash** from Google for fast, accurate market predictions.
+
+**Q: How often does the AI analyze the market?**  
+A: Approximately every few minutes, but it only trades when conditions meet the strategy criteria.
+
+**Q: Can I see the AI's reasoning?**  
+A: Yes, all AI decisions are logged in the transaction log with full reasoning explanations.
+
+**Q: Can I control the AI's risk level?**  
+A: Advanced risk settings are coming soon. Currently, the AI uses moderate risk parameters.
+
+**Q: What if I disagree with an AI trade?**  
+A: You can pause the agent in Profile settings or revoke the session key to stop further trades.
+
+### Security & Privacy
+
+**Q: Is my data safe?**  
+A: Yes, we use:
+- **Supabase authentication** with industry-standard security
+- **Row Level Security (RLS)** on all database tables
+- **HTTPS** for all communications
+- **No private keys stored** (only wallet addresses)
+
+**Q: Can TrusTek access my wallet funds?**  
+A: No, session keys only allow trading within your vault. They cannot withdraw funds or access your main wallet.
+
+**Q: What happens if TrusTek gets hacked?**  
+A: Your main wallet private key is never shared with TrusTek. Session keys have limited permissions and expiry dates. You can revoke all session keys instantly.
+
+**Q: Is my trading history public?**  
+A: No, your transaction log is private and only visible to you.
+
+### Blockchain & Gas Fees
+
+**Q: Which blockchain does TrusTek use?**  
+A: **Starknet**, a Layer 2 scaling solution for Ethereum.
+
+**Q: Do I need to pay gas fees?**  
+A: Yes, all blockchain transactions require gas fees paid in ETH on Starknet.
+
+**Q: How much are gas fees?**  
+A: Starknet gas fees are typically much lower than Ethereum mainnet, usually a few cents per transaction.
+
+**Q: Can I see transactions on a blockchain explorer?**  
+A: Yes, click the "View on Explorer" button next to any token to open Starkscan.
+
+### Troubleshooting
+
+**Q: I'm stuck on the loading screen**  
+A: The app has a 5-second timeout. If still stuck, clear browser cache and reload.
+
+**Q: Prices show "N/A"**  
+A: Check if backend is running, verify internet connection, and try manual refresh.
+
+**Q: "Invalid credentials" error when logging in**  
+A: Verify email/password spelling, check if account is confirmed, or try resetting password.
+
+**Q: Session key creation fails**  
+A: Make sure wallet is connected and has sufficient ETH for gas fees.
+
+**Q: I can still access dashboard after logout**  
+A: Hard refresh (Ctrl+Shift+R), clear all browser data, or try incognito mode.
+
+### Development
+
+**Q: Can I contribute to the project?**  
+A: Yes! Fork the repository, make your changes, and submit a pull request.
+
+**Q: How do I run TrusTek locally?**  
+A: See the **Quick Start** section above for step-by-step instructions.
+
+**Q: Is there API documentation?**  
+A: Yes, when backend is running, visit http://localhost:8000/docs for interactive API docs.
+
+**Q: Can I deploy my own instance?**  
+A: Yes, TrusTek is open-source. See the **Deployment** section for instructions.
+
+---
+
+## 📚 Additional Resources
+
+- [USER_GUIDE.md](USER_GUIDE.md) - Complete step-by-step user guide
+- [database/README.md](database/README.md) - Database setup and schema documentation
 - [Starknet Documentation](https://docs.starknet.io)
 - [Supabase Documentation](https://supabase.com/docs)
 - [Gemini API Documentation](https://ai.google.dev/docs)
